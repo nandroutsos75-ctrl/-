@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#243A30">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Εργαζόμενοι</title>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+}
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  :root{
+    --bg:#FBF6EC;
+    --card:#FFFFFF;
+    --ink:#1E241F;
+    --muted:#6E7770;
+    --line:#E7DECF;
+    --green:#243A30;
+    --green-soft:#EAF0EB;
+    --amber:#C8602E;
+    --amber-soft:#F8E9DF;
+    --shadow:0 1px 2px rgba(30,36,31,.05),0 8px 24px rgba(30,36,31,.06);
+    --radius:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .app{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+
+  header{
+    padding:calc(env(safe-area-inset-top) + 22px) 22px 16px;
+    background:var(--green);
+    color:#F4EFE3;
+    border-bottom-left-radius:26px;
+    border-bottom-right-radius:26px;
+  }
+  header .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;font-weight:600}
+  header h1{font-size:23px;font-weight:700;margin-top:3px;letter-spacing:-.01em}
+  header .sub{font-size:13.5px;opacity:.72;margin-top:4px}
+
+  main{flex:1;padding:18px 16px 110px}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:6px 4px 12px}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:16px;
+    margin-bottom:14px;
+  }
+
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:0 0 6px 2px}
+  input,select,textarea{
+    width:100%;font:inherit;color:var(--ink);
+    background:var(--bg);
+    border:1.5px solid var(--line);
+    border-radius:12px;padding:12px 13px;
+    outline:none;transition:border-color .15s;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--green)}
+  textarea{resize:vertical;min-height:70px}
+  .field{margin-bottom:13px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;font:inherit;font-weight:700;font-size:15.5px;
+    padding:14px;border:none;border-radius:13px;cursor:pointer;
+    background:var(--green);color:#F4EFE3;transition:transform .08s,opacity .15s;
+  }
+  .btn:active{transform:scale(.985)}
+  .btn.amber{background:var(--amber)}
+  .btn.ghost{background:var(--green-soft);color:var(--green)}
+  .btn.small{width:auto;padding:9px 14px;font-size:13.5px;border-radius:10px}
+
+  /* star rating */
+  .stars{display:flex;gap:6px;font-size:30px;line-height:1}
+  .stars span{cursor:pointer;color:var(--line);transition:transform .1s,color .12s}
+  .stars span.on{color:var(--amber)}
+  .stars span:active{transform:scale(1.2)}
+
+  /* employee item */
+  .emp{display:flex;align-items:center;gap:13px;padding:14px 16px;background:var(--card);
+    border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-bottom:11px}
+  .avatar{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:17px;color:#fff;letter-spacing:.02em}
+  .emp .meta{flex:1;min-width:0}
+  .emp .meta b{font-size:16px;font-weight:700;display:block}
+  .emp .meta small{color:var(--muted);font-size:13px}
+  .emp .hrs{text-align:right;flex:none}
+  .emp .hrs b{font-size:19px;color:var(--green);font-weight:800;display:block;line-height:1}
+  .emp .hrs small{font-size:11px;color:var(--muted)}
+
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
+    background:var(--amber-soft);color:var(--amber);letter-spacing:.02em}
+
+  /* log entry */
+  .log{padding:13px 15px;background:var(--card);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);margin-bottom:10px}
+  .log .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .log .top b{font-size:15px}
+  .log .top .h{font-weight:800;color:var(--green);font-size:15px;white-space:nowrap}
+  .log .date{font-size:12px;color:var(--muted);margin-top:1px}
+  .log .note{font-size:14px;margin-top:7px;color:#3a443c}
+  .log .rate{font-size:14px;color:var(--amber);margin-top:6px;letter-spacing:1px}
+  .log .x{float:right;color:var(--muted);font-size:13px;background:none;border:none;cursor:pointer;font-weight:600;padding:0}
+
+  .empty{text-align:center;color:var(--muted);padding:46px 20px;font-size:14.5px}
+  .empty .big{font-size:40px;margin-bottom:8px;opacity:.7}
+
+  /* summary stats */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:16px}
+  .stat{background:var(--green);color:#F4EFE3;border-radius:16px;padding:16px}
+  .stat.alt{background:var(--amber)}
+  .stat .n{font-size:28px;font-weight:800;letter-spacing:-.02em}
+  .stat .l{font-size:12.5px;opacity:.8;margin-top:2px}
+
+  .seg{display:flex;background:var(--green-soft);border-radius:12px;padding:4px;margin-bottom:16px}
+  .seg button{flex:1;border:none;background:none;font:inherit;font-weight:700;font-size:13.5px;
+    padding:9px;border-radius:9px;color:var(--green);cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--card);box-shadow:var(--shadow)}
+
+  .costbar{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+    padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .costbar .l{font-size:13px;color:var(--muted);font-weight:600}
+  .costbar .v{font-size:22px;font-weight:800;color:var(--amber)}
+
+  /* card / καρτέλα */
+  .backbtn{background:none;border:none;font:inherit;font-weight:700;font-size:14.5px;color:var(--green);
+    cursor:pointer;padding:0 0 14px;display:flex;align-items:center;gap:6px}
+  .profile{display:flex;align-items:center;gap:15px;margin-bottom:16px}
+  .profile .avatar{width:62px;height:62px;font-size:23px}
+  .profile h2{font-size:21px;font-weight:800;line-height:1.1}
+  .profile small{color:var(--muted);font-size:13.5px}
+  .miniStats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px}
+  .miniStats .m{background:var(--green-soft);border-radius:14px;padding:12px 8px;text-align:center}
+  .miniStats .m b{font-size:18px;font-weight:800;color:var(--green);display:block;line-height:1.1}
+  .miniStats .m small{font-size:11px;color:var(--muted)}
+
+  /* table quick entry */
+  .trow{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:9px;transition:.15s}
+  .trow.sel{border-color:var(--green);background:var(--green-soft)}
+  .trow .tick{width:26px;height:26px;flex:none;border-radius:8px;border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;background:transparent;transition:.15s}
+  .trow.sel .tick{background:var(--green);border-color:var(--green)}
+  .trow .nm{flex:1;min-width:0}
+  .trow .nm b{font-size:15px;font-weight:700;display:block}
+  .trow .nm small{font-size:12px;color:var(--muted)}
+  .trow .hin{width:62px;flex:none}
+  .trow .hin input{padding:8px;text-align:center;font-weight:700}
+  .trow .dlabel{font-size:12px;font-weight:700;color:var(--amber)}
+
+  /* nav */
+  nav{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;
+    background:rgba(255,255,255,.92);backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);display:flex;
+    padding:8px 8px calc(env(safe-area-inset-bottom) + 8px)}
+  nav button{flex:1;border:none;background:none;cursor:pointer;font:inherit;
+    display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px;color:var(--muted)}
+  nav button .ic{font-size:21px;line-height:1}
+  nav button .tx{font-size:11px;font-weight:700}
+  nav button.on{color:var(--green)}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(30,36,31,.45);display:none;align-items:flex-end;
+    justify-content:center;z-index:50;animation:fade .2s}
+  .modal.open{display:flex}
+  .sheet{background:var(--bg);width:100%;max-width:520px;border-top-left-radius:24px;border-top-right-radius:24px;
+    padding:22px 18px calc(env(safe-area-inset-bottom) + 22px);max-height:90vh;overflow:auto;animation:up .25s ease}
+  @keyframes up{from{transform:translateY(100%)}to{transform:none}}
+  .sheet h2{font-size:19px;margin-bottom:16px;font-weight:800}
+  .sheet .close{float:right;font-size:22px;color:var(--muted);background:none;border:none;cursor:pointer;line-height:1}
+  .hint{font-size:12.5px;color:var(--muted);margin:-6px 2px 14px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="eyebrow">Προσωπική χρήση</div>
+    <h1>Διαχείριση Εργαζομένων</h1>
+    <div class="sub" id="headerSub">Ώρες & παραγωγικότητα</div>
+  </header>
+
+  <main>
+    <!-- ΚΑΤΑΓΡΑΦΗ -->
+    <section class="view active" id="view-log">
+      <div class="seg" id="logModeSeg">
+        <button class="on" data-m="single">Αναλυτικά</button>
+        <button data-m="table">Πίνακας · γρήγορα</button>
+      </div>
+
+      <!-- ΑΝΑΛΥΤΙΚΑ -->
+      <div id="logSingle">
+        <div class="card">
+          <div class="field">
+            <label>Εργαζόμενος</label>
+            <select id="logEmp" onchange="autoEntryMode()"></select>
+          </div>
+          <div class="field">
+            <label>Καταγραφή με</label>
+            <div class="seg" id="entrySeg" style="margin-bottom:0">
+              <button class="on" data-e="hours">Ώρες</button>
+              <button data-e="day">Ημέρα (ημερομίσθιο)</button>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Ημερομηνία</label>
+              <input type="date" id="logDate">
+            </div>
+            <div class="field" id="hoursField">
+              <label>Ώρες</label>
+              <input type="number" id="logHours" inputmode="decimal" step="0.5" min="0" placeholder="π.χ. 8">
+            </div>
+          </div>
+          <div class="field">
+            <label>Παραγωγικότητα</label>
+            <div class="stars" id="logStars">
+              <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Σημείωση (προαιρετικό)</label>
+            <textarea id="logNote" placeholder="π.χ. ολοκλήρωσε την παραγγελία, αργοπορία 20', πολύ καλή απόδοση..."></textarea>
+          </div>
+          <button class="btn" onclick="saveLog()">Αποθήκευση καταγραφής</button>
+        </div>
+      </div>
+
+      <!-- ΠΙΝΑΚΑΣ -->
+      <div id="logTable" style="display:none">
+        <div class="field">
+          <label>Ημερομηνία</label>
+          <input type="date" id="tblDate" onchange="renderTable()">
+        </div>
+        <p class="hint">Τσέκαρε όσους δούλεψαν. Για ωρομίσθιους πρόσαρμοσε τις ώρες· οι ημερομίσθιοι μετρούν ως 1 ημέρα.</p>
+        <div id="tblRows"></div>
+        <button class="btn" onclick="saveTable()" style="margin-top:6px">Αποθήκευση επιλεγμένων</button>
+      </div>
+
+      <div class="section-title" style="margin-top:18px">Πρόσφατες καταγραφές</div>
+      <div id="recentLogs"></div>
+    </section>
+
+    <!-- ΕΡΓΑΖΟΜΕΝΟΙ -->
+    <section class="view" id="view-emp">
+      <button class="btn amber" onclick="openEmpModal()" style="margin-bottom:18px">＋ Προσθήκη εργαζομένου</button>
+      <div class="section-title">Η ομάδα μου</div>
+      <div id="empList"></div>
+    </section>
+
+    <!-- ΣΥΝΟΨΗ -->
+    <section class="view" id="view-sum">
+      <div class="seg" id="rangeSeg">
+        <button class="on" data-r="week">Εβδομάδα</button>
+        <button data-r="month">Μήνας</button>
+        <button data-r="all">Σύνολο</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="stHours">0</div><div class="l">Συνολικές ώρες</div></div>
+        <div class="stat alt"><div class="n" id="stAvg">–</div><div class="l">Μ.Ο. παραγωγικότητας</div></div>
+      </div>
+      <div class="costbar"><span class="l">Εκτιμώμενο κόστος (δεδουλευμένα)</span><span class="v" id="stCost">€0</span></div>
+      <div class="costbar"><span class="l">Πληρωμές περιόδου</span><span class="v" id="stPaid" style="color:var(--green)">€0</span></div>
+      <div class="section-title">Ανά εργαζόμενο</div>
+      <div id="sumList"></div>
+    </section>
+
+    <!-- ΚΑΡΤΕΛΑ ΕΡΓΑΖΟΜΕΝΟΥ -->
+    <section class="view" id="view-card">
+      <button class="backbtn" onclick="go('emp')">‹ Πίσω στους εργαζόμενους</button>
+      <div class="profile">
+        <div class="avatar" id="cardAvatar"></div>
+        <div><h2 id="cardName"></h2><small id="cardRole"></small></div>
+      </div>
+      <div class="miniStats">
+        <div class="m"><b id="cardHours">0</b><small>ώρες</small></div>
+        <div class="m"><b id="cardDays">0</b><small>ημέρες</small></div>
+        <div class="m"><b id="cardRate">–</b><small>μ.ο. ★</small></div>
+      </div>
+      <div class="costbar"><span class="l" id="cardCostLabel">Δεδουλευμένα</span><span class="v" id="cardCost">€0</span></div>
+      <button class="btn ghost" onclick="editCurrentEmp()" style="margin-bottom:18px">✎ Επεξεργασία στοιχείων</button>
+
+      <div class="section-title">Πληρωμές</div>
+      <div class="costbar"><span class="l">Πληρωμένα</span><span class="v" id="cardPaid" style="color:var(--green)">€0</span></div>
+      <div class="costbar"><span class="l">Υπόλοιπο (οφειλόμενα)</span><span class="v" id="cardOwed">€0</span></div>
+      <button class="btn amber" onclick="openPayModal()" style="margin-bottom:16px">＋ Νέα πληρωμή</button>
+      <div id="cardPays"></div>
+
+      <div class="section-title">Όλες οι καταγραφές</div>
+      <div id="cardLogs"></div>
+    </section>
+
+    <!-- ΔΕΔΟΜΕΝΑ -->
+    <section class="view" id="view-data">
+      <div class="section-title">Αντίγραφο ασφαλείας</div>
+      <div class="card">
+        <p style="font-size:14px;color:var(--muted);margin-bottom:14px">Κατέβασε όλα τα δεδομένα σου σε ένα αρχείο. Κράτησέ το σε ασφαλές μέρος — μπορείς να το επαναφέρεις εδώ ή σε άλλο κινητό.</p>
+        <button class="btn" onclick="exportData()">⤓ Εξαγωγή (download backup)</button>
+        <label class="btn ghost" style="margin-top:10px;cursor:pointer">⤒ Εισαγωγή από αρχείο
+          <input type="file" accept="application/json,.json" onchange="importData(event)" style="display:none">
+        </label>
+        <p class="hint" style="margin-top:14px">Η εισαγωγή αντικαθιστά τα τρέχοντα δεδομένα.</p>
+      </div>
+      <div class="section-title">Στατιστικά</div>
+      <div class="card" style="font-size:14.5px;color:var(--ink)">
+        <div id="dataCounts"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav>
+    <button class="on" data-v="log" onclick="go('log')"><span class="ic">＋</span><span class="tx">Καταγραφή</span></button>
+    <button data-v="emp" onclick="go('emp')"><span class="ic">☺</span><span class="tx">Εργαζόμενοι</span></button>
+    <button data-v="sum" onclick="go('sum')"><span class="ic">▦</span><span class="tx">Σύνοψη</span></button>
+    <button data-v="data" onclick="go('data')"><span class="ic">⤓</span><span class="tx">Δεδομένα</span></button>
+  </nav>
+</div>
+
+<!-- MODAL: εργαζόμενος -->
+<div class="modal" id="empModal">
+  <div class="sheet">
+    <button class="close" onclick="closeEmpModal()">✕</button>
+    <h2 id="empModalTitle">Νέος εργαζόμενος</h2>
+    <div class="field">
+      <label>Ονοματεπώνυμο</label>
+      <input type="text" id="empName" placeholder="π.χ. Μαρία Παπαδοπούλου">
+    </div>
+    <div class="field">
+      <label>Θέση / ρόλος (προαιρετικό)</label>
+      <input type="text" id="empRole" placeholder="π.χ. Πωλήτρια">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Τύπος αμοιβής</label>
+        <select id="empWageType">
+          <option value="hourly">Ωρομίσθιο</option>
+          <option value="daily">Ημερομίσθιο</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Ποσό (€)</label>
+        <input type="number" id="empRate" inputmode="decimal" step="0.5" min="0" placeholder="π.χ. 5">
+      </div>
+    </div>
+    <button class="btn" onclick="saveEmp()">Αποθήκευση</button>
+    <button class="btn ghost" id="empDeleteBtn" style="margin-top:10px;display:none" onclick="deleteEmp()">Διαγραφή εργαζομένου</button>
+  </div>
+</div>
+
+<!-- MODAL: πληρωμή -->
+<div class="modal" id="payModal">
+  <div class="sheet">
+    <button class="close" onclick="closePayModal()">✕</button>
+    <h2 id="payModalTitle">Νέα πληρωμή</h2>
+    <div class="field">
+      <label>Εργαζόμενος</label>
+      <select id="payEmp"></select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Ημερομηνία</label>
+        <input type="date" id="payDate">
+      </div>
+      <div class="field">
+        <label>Ποσό (€)</label>
+        <input type="number" id="payAmount" inputmode="decimal" step="0.5" min="0" placeholder="π.χ. 200">
+      </div>
+    </div>
+    <div class="field">
+      <label>Σημείωση (προαιρετικό)</label>
+      <input type="text" id="payNote" placeholder="π.χ. προκαταβολή, εξόφληση εβδομάδας">
+    </div>
+    <button class="btn" onclick="savePay()">Αποθήκευση πληρωμής</button>
+    <button class="btn ghost" id="payDeleteBtn" style="margin-top:10px;display:none" onclick="deletePay()">Διαγραφή πληρωμής</button>
+  </div>
+</div>
+
+<script>
+/* ---------- Αποθήκευση (με ασφαλές fallback στη μνήμη) ---------- */
+const KEY='diax_ergaz_v1';
+let mem=null;
+function load(){
+  let d;
+  try{const r=localStorage.getItem(KEY);d=r?JSON.parse(r):null;}
+  catch(e){d=mem;}
+  if(!d)d={employees:[],logs:[],payments:[]};
+  if(!Array.isArray(d.employees))d.employees=[];
+  if(!Array.isArray(d.logs))d.logs=[];
+  if(!Array.isArray(d.payments))d.payments=[];
+  return d;
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(db));}
+  catch(e){mem=db;} // σε περιβάλλον χωρίς αποθήκευση, κρατάμε στη μνήμη
+}
+let db=load();
+
+/* ---------- Βοηθητικά ---------- */
+const $=s=>document.querySelector(s);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const COLORS=['#243A30','#C8602E','#5B7A6B','#A8552C','#37564A','#8C6B3F'];
+const colorFor=i=>COLORS[i%COLORS.length];
+const initials=n=>n.trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+function fmtDate(d){
+  const dt=new Date(d+'T00:00:00');
+  return dt.toLocaleDateString('el-GR',{weekday:'short',day:'numeric',month:'short'});
+}
+function todayISO(){return new Date().toISOString().slice(0,10);}
+
+/* ---------- Πλοήγηση ---------- */
+function go(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  $('#view-'+v).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(v==='emp')renderEmp();
+  if(v==='sum')renderSum();
+  if(v==='log'){fillEmpSelect();renderRecent();}
+  if(v==='data')renderData();
+  window.scrollTo(0,0);
+}
+
+/* ---------- Εργαζόμενοι ---------- */
+let editingEmp=null;
+function openEmpModal(emp){
+  editingEmp=emp||null;
+  $('#empModalTitle').textContent=emp?'Επεξεργασία':'Νέος εργαζόμενος';
+  $('#empName').value=emp?emp.name:'';
+  $('#empRole').value=emp?(emp.role||''):'';
+  $('#empWageType').value=emp?(emp.wageType||'hourly'):'hourly';
+  $('#empRate').value=emp&&emp.rate?emp.rate:'';
+  $('#empDeleteBtn').style.display=emp?'flex':'none';
+  $('#empModal').classList.add('open');
+}
+function closeEmpModal(){$('#empModal').classList.remove('open');editingEmp=null;}
+function saveEmp(){
+  const name=$('#empName').value.trim();
+  if(!name){alert('Γράψε ένα όνομα.');return;}
+  const role=$('#empRole').value.trim();
+  const wageType=$('#empWageType').value;
+  const rate=parseFloat($('#empRate').value)||0;
+  if(editingEmp){editingEmp.name=name;editingEmp.role=role;editingEmp.wageType=wageType;editingEmp.rate=rate;}
+  else{db.employees.push({id:uid(),name,role,wageType,rate});}
+  save();closeEmpModal();renderEmp();fillEmpSelect();
+  if(currentCardId)openCard(currentCardId);
+}
+function deleteEmp(){
+  if(!editingEmp)return;
+  if(!confirm('Διαγραφή του εργαζομένου και των καταγραφών του;'))return;
+  db.employees=db.employees.filter(e=>e.id!==editingEmp.id);
+  db.logs=db.logs.filter(l=>l.empId!==editingEmp.id);
+  save();closeEmpModal();currentCardId=null;go('emp');fillEmpSelect();
+}
+function renderEmp(){
+  const el=$('#empList');
+  if(!db.employees.length){el.innerHTML='<div class="empty"><div class="big">☺</div>Δεν υπάρχουν εργαζόμενοι ακόμη.<br>Πρόσθεσε τον πρώτο σου.</div>';return;}
+  el.innerHTML=db.employees.map((e,i)=>{
+    const total=db.logs.filter(l=>l.empId===e.id).reduce((s,l)=>s+(+l.hours||0),0);
+    return `<div class="emp" onclick='openCard("${e.id}")'>
+      <div class="avatar" style="background:${colorFor(i)}">${initials(e.name)}</div>
+      <div class="meta"><b>${esc(e.name)}</b><small>${e.role?esc(e.role):'—'}</small></div>
+      <div class="hrs"><b>${fmtNum(total)}</b><small>ώρες σύνολο</small></div>
+    </div>`;
+  }).join('');
+}
+function editEmp(id){openEmpModal(db.employees.find(e=>e.id===id));}
+
+/* ---------- Καρτέλα εργαζομένου ---------- */
+let currentCardId=null;
+function empCost(emp,logs){
+  const r=+emp.rate||0;
+  if(!r)return null;
+  if(emp.wageType==='daily'){
+    const days=new Set(logs.map(l=>l.date)).size;
+    return days*r;
+  }
+  const hours=logs.reduce((s,l)=>s+(+l.hours||0),0);
+  return hours*r;
+}
+function openCard(id){
+  const e=db.employees.find(x=>x.id===id);if(!e)return;
+  currentCardId=id;
+  const i=db.employees.indexOf(e);
+  const logs=db.logs.filter(l=>l.empId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  const hours=logs.reduce((s,l)=>s+(+l.hours||0),0);
+  const days=new Set(logs.map(l=>l.date)).size;
+  const rated=logs.filter(l=>l.rating>0);
+  const avg=rated.length?(rated.reduce((s,l)=>s+l.rating,0)/rated.length):0;
+  const cost=empCost(e,logs);
+  $('#cardAvatar').textContent=initials(e.name);
+  $('#cardAvatar').style.background=colorFor(i);
+  $('#cardName').textContent=e.name;
+  const wageTxt=e.rate?(e.wageType==='daily'?`Ημερομίσθιο €${fmtNum(e.rate)}`:`Ωρομίσθιο €${fmtNum(e.rate)}`):'Χωρίς αμοιβή';
+  $('#cardRole').textContent=(e.role?e.role+' · ':'')+wageTxt;
+  $('#cardHours').textContent=fmtNum(hours);
+  $('#cardDays').textContent=days;
+  $('#cardRate').textContent=avg?avg.toFixed(1):'–';
+  $('#cardCostLabel').textContent=e.wageType==='daily'?`Δεδουλευμένα (${days} ημέρες)`:`Δεδουλευμένα (${fmtNum(hours)} ώρες)`;
+  $('#cardCost').textContent=cost===null?'—':'€'+fmtNum(cost);
+  // πληρωμές & υπόλοιπο
+  const pays=db.payments.filter(p=>p.empId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  const paid=pays.reduce((s,p)=>s+(+p.amount||0),0);
+  $('#cardPaid').textContent='€'+fmtNum(paid);
+  const owed=cost===null?null:(cost-paid);
+  const owedEl=$('#cardOwed');
+  if(owed===null){owedEl.textContent='—';owedEl.style.color='var(--muted)';}
+  else{owedEl.textContent='€'+fmtNum(owed);owedEl.style.color=owed>0.01?'var(--amber)':'var(--green)';}
+  const pe=$('#cardPays');
+  pe.innerHTML=pays.length?pays.map(p=>`<div class="log" onclick='editPay("${p.id}")'>
+      <div class="top"><b>${fmtDate(p.date)}</b><span class="h" style="color:var(--green)">€${fmtNum(p.amount)}</span></div>
+      ${p.note?`<div class="note">${esc(p.note)}</div>`:''}
+    </div>`).join(''):'<div class="empty" style="padding:22px">Καμία πληρωμή ακόμη.</div>';
+  const lg=$('#cardLogs');
+  lg.innerHTML=logs.length?logs.map(l=>`<div class="log">
+      <button class="x" onclick='delLogCard("${l.id}")'>διαγραφή</button>
+      <div class="top"><b>${fmtDate(l.date)}</b><span class="h">${hLabel(l)}</span></div>
+      ${l.rating?`<div class="rate">${'★'.repeat(l.rating)}${'☆'.repeat(5-l.rating)}</div>`:''}
+      ${l.note?`<div class="note">${esc(l.note)}</div>`:''}
+    </div>`).join(''):'<div class="empty">Καμία καταγραφή ακόμη.</div>';
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  $('#view-card').classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==='emp'));
+  window.scrollTo(0,0);
+}
+function editCurrentEmp(){if(currentCardId)editEmp(currentCardId);}
+function delLogCard(id){
+  if(!confirm('Διαγραφή καταγραφής;'))return;
+  db.logs=db.logs.filter(l=>l.id!==id);save();openCard(currentCardId);
+}
+
+/* ---------- Πληρωμές ---------- */
+let editingPay=null;
+function openPayModal(pay){
+  editingPay=pay||null;
+  $('#payModalTitle').textContent=pay?'Επεξεργασία πληρωμής':'Νέα πληρωμή';
+  const s=$('#payEmp');
+  if(!db.employees.length){s.innerHTML='<option value="">— πρόσθεσε πρώτα εργαζόμενο —</option>';}
+  else{s.innerHTML=db.employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');}
+  s.value=pay?pay.empId:(currentCardId||(db.employees[0]&&db.employees[0].id)||'');
+  $('#payDate').value=pay?pay.date:todayISO();
+  $('#payAmount').value=pay?pay.amount:'';
+  $('#payNote').value=pay?(pay.note||''):'';
+  $('#payDeleteBtn').style.display=pay?'flex':'none';
+  $('#payModal').classList.add('open');
+}
+function closePayModal(){$('#payModal').classList.remove('open');editingPay=null;}
+function savePay(){
+  const empId=$('#payEmp').value;
+  if(!empId){alert('Διάλεξε εργαζόμενο.');return;}
+  const amount=parseFloat($('#payAmount').value);
+  if(!(amount>0)){alert('Συμπλήρωσε ποσό μεγαλύτερο του 0.');return;}
+  const date=$('#payDate').value||todayISO();
+  const note=$('#payNote').value.trim();
+  if(editingPay){editingPay.empId=empId;editingPay.amount=amount;editingPay.date=date;editingPay.note=note;}
+  else{db.payments.push({id:uid(),empId,amount,date,note});}
+  save();closePayModal();
+  if(currentCardId)openCard(currentCardId);
+  flash('Η πληρωμή αποθηκεύτηκε ✓');
+}
+function editPay(id){openPayModal(db.payments.find(p=>p.id===id));}
+function deletePay(){
+  if(!editingPay)return;
+  if(!confirm('Διαγραφή πληρωμής;'))return;
+  db.payments=db.payments.filter(p=>p.id!==editingPay.id);
+  save();closePayModal();
+  if(currentCardId)openCard(currentCardId);
+}
+
+/* ---------- Καταγραφή ---------- */
+let logRating=0;
+let entryMode='hours'; // 'hours' | 'day'
+function fillEmpSelect(){
+  const s=$('#logEmp');
+  if(!db.employees.length){s.innerHTML='<option value="">— πρόσθεσε πρώτα εργαζόμενο —</option>';return;}
+  s.innerHTML=db.employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  autoEntryMode();
+}
+// τρόπος καταγραφής (ώρες ή ημέρα) — segment
+$('#entrySeg').addEventListener('click',ev=>{
+  const e=ev.target.dataset.e;if(!e)return;
+  setEntryMode(e);
+});
+function setEntryMode(m){
+  entryMode=m;
+  document.querySelectorAll('#entrySeg button').forEach(b=>b.classList.toggle('on',b.dataset.e===m));
+  $('#hoursField').style.display=m==='day'?'none':'';
+}
+// όταν αλλάζει εργαζόμενος, προτείνει αυτόματα τρόπο βάσει τύπου αμοιβής
+function autoEntryMode(){
+  const e=db.employees.find(x=>x.id===$('#logEmp').value);
+  setEntryMode(e&&e.wageType==='daily'?'day':'hours');
+}
+$('#logStars').addEventListener('click',ev=>{
+  const v=ev.target.dataset.v;if(!v)return;
+  logRating=+v;paintStars();
+});
+function paintStars(){
+  document.querySelectorAll('#logStars span').forEach(s=>s.classList.toggle('on',+s.dataset.v<=logRating));
+}
+function saveLog(){
+  const empId=$('#logEmp').value;
+  if(!empId){alert('Διάλεξε εργαζόμενο (ή πρόσθεσε έναν πρώτα).');return;}
+  let hours;
+  if(entryMode==='day'){
+    hours=0; // ημερομίσθιο: μετρά ως 1 ημέρα, ανεξάρτητα ωρών
+  }else{
+    const h=$('#logHours').value;
+    if(h===''||+h<0){alert('Συμπλήρωσε τις ώρες.');return;}
+    hours=+h;
+  }
+  db.logs.push({
+    id:uid(),empId,date:$('#logDate').value||todayISO(),
+    hours,rating:logRating,note:$('#logNote').value.trim(),day:entryMode==='day'
+  });
+  save();
+  $('#logHours').value='';$('#logNote').value='';logRating=0;paintStars();
+  renderRecent();
+  flash('Αποθηκεύτηκε ✓');
+}
+
+/* ---------- Πίνακας γρήγορης καταχώρησης ---------- */
+$('#logModeSeg').addEventListener('click',ev=>{
+  const m=ev.target.dataset.m;if(!m)return;
+  document.querySelectorAll('#logModeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('#logSingle').style.display=m==='single'?'':'none';
+  $('#logTable').style.display=m==='table'?'':'none';
+  if(m==='table'){if(!$('#tblDate').value)$('#tblDate').value=todayISO();renderTable();}
+});
+let tblSel={}; // empId -> {checked, hours}
+function renderTable(){
+  const el=$('#tblRows');
+  if(!db.employees.length){el.innerHTML='<div class="empty">Πρόσθεσε εργαζομένους πρώτα.</div>';return;}
+  el.innerHTML=db.employees.map((e,i)=>{
+    const st=tblSel[e.id]||{checked:false,hours:8};
+    tblSel[e.id]=st;
+    const daily=e.wageType==='daily';
+    return `<div class="trow${st.checked?' sel':''}" id="tr-${e.id}">
+      <div class="tick" onclick='toggleRow("${e.id}")'>${st.checked?'✓':''}</div>
+      <div class="nm" onclick='toggleRow("${e.id}")'>
+        <b>${esc(e.name)}</b><small>${daily?'ημερομίσθιο':'ωρομίσθιο'}${e.role?' · '+esc(e.role):''}</small>
+      </div>
+      ${daily
+        ? `<div class="dlabel">1 ημέρα</div>`
+        : `<div class="hin"><input type="number" inputmode="decimal" step="0.5" min="0" value="${st.hours}" oninput='tblSel["${e.id}"].hours=this.value'></div>`}
+    </div>`;
+  }).join('');
+}
+function toggleRow(id){
+  tblSel[id].checked=!tblSel[id].checked;
+  const r=$('#tr-'+id);
+  r.classList.toggle('sel',tblSel[id].checked);
+  r.querySelector('.tick').textContent=tblSel[id].checked?'✓':'';
+}
+function saveTable(){
+  const date=$('#tblDate').value||todayISO();
+  const picked=db.employees.filter(e=>tblSel[e.id]&&tblSel[e.id].checked);
+  if(!picked.length){alert('Δεν επέλεξες κανέναν.');return;}
+  let n=0;
+  picked.forEach(e=>{
+    const daily=e.wageType==='daily';
+    const hours=daily?0:(parseFloat(tblSel[e.id].hours)||0);
+    db.logs.push({id:uid(),empId:e.id,date,hours,rating:0,note:'',day:daily});
+    n++;
+  });
+  save();
+  tblSel={};renderTable();renderRecent();
+  flash(n+' καταγραφές αποθηκεύτηκαν ✓');
+}
+function renderRecent(){
+  const el=$('#recentLogs');
+  const logs=[...db.logs].sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)).slice(0,12);
+  if(!logs.length){el.innerHTML='<div class="empty"><div class="big">▦</div>Καμία καταγραφή ακόμη.</div>';return;}
+  el.innerHTML=logs.map(l=>{
+    const e=db.employees.find(x=>x.id===l.empId);
+    return `<div class="log">
+      <button class="x" onclick='delLog("${l.id}")'>διαγραφή</button>
+      <div class="top"><b>${e?esc(e.name):'—'}</b><span class="h">${hLabel(l)}</span></div>
+      <div class="date">${fmtDate(l.date)}</div>
+      ${l.rating?`<div class="rate">${'★'.repeat(l.rating)}${'☆'.repeat(5-l.rating)}</div>`:''}
+      ${l.note?`<div class="note">${esc(l.note)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+function delLog(id){
+  if(!confirm('Διαγραφή καταγραφής;'))return;
+  db.logs=db.logs.filter(l=>l.id!==id);save();renderRecent();
+}
+
+/* ---------- Σύνοψη ---------- */
+let range='week';
+$('#rangeSeg').addEventListener('click',ev=>{
+  const r=ev.target.dataset.r;if(!r)return;
+  range=r;
+  document.querySelectorAll('#rangeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.r===r));
+  renderSum();
+});
+function inRange(date){
+  if(range==='all')return true;
+  const d=new Date(date+'T00:00:00'),now=new Date();
+  const days=(now-d)/86400000;
+  return range==='week'?days<7:days<31;
+}
+function renderSum(){
+  const logs=db.logs.filter(l=>inRange(l.date));
+  const totalH=logs.reduce((s,l)=>s+(+l.hours||0),0);
+  const rated=logs.filter(l=>l.rating>0);
+  const avg=rated.length?(rated.reduce((s,l)=>s+l.rating,0)/rated.length):0;
+  $('#stHours').textContent=fmtNum(totalH);
+  $('#stAvg').textContent=avg?avg.toFixed(1)+'★':'–';
+  const paidPeriod=db.payments.filter(p=>inRange(p.date)).reduce((s,p)=>s+(+p.amount||0),0);
+  $('#stPaid').textContent='€'+fmtNum(paidPeriod);
+  const el=$('#sumList');
+  if(!db.employees.length){el.innerHTML='<div class="empty">Πρόσθεσε εργαζομένους για να δεις στατιστικά.</div>';$('#stCost').textContent='€0';return;}
+  let totalCost=0,hasCost=false;
+  const rows=db.employees.map((e,i)=>{
+    const ls=logs.filter(l=>l.empId===e.id);
+    const h=ls.reduce((s,l)=>s+(+l.hours||0),0);
+    const r=ls.filter(l=>l.rating>0);
+    const a=r.length?(r.reduce((s,l)=>s+l.rating,0)/r.length):0;
+    const c=empCost(e,ls);
+    if(c!==null){totalCost+=c;hasCost=true;}
+    return {e,i,h,a,n:ls.length,c};
+  }).sort((a,b)=>b.h-a.h);
+  $('#stCost').textContent=hasCost?'€'+fmtNum(totalCost):'—';
+  el.innerHTML=rows.map(o=>`
+    <div class="emp" onclick='openCard("${o.e.id}")'>
+      <div class="avatar" style="background:${colorFor(o.i)}">${initials(o.e.name)}</div>
+      <div class="meta"><b>${esc(o.e.name)}</b><small>${o.n} καταγραφές ${o.a?'· '+o.a.toFixed(1)+'★':''}${o.c!==null?' · €'+fmtNum(o.c):''}</small></div>
+      <div class="hrs"><b>${fmtNum(o.h)}</b><small>ώρες</small></div>
+    </div>`).join('');
+}
+
+/* ---------- Δεδομένα: export / import ---------- */
+function renderData(){
+  const emps=db.employees.length, logs=db.logs.length;
+  const totalH=db.logs.reduce((s,l)=>s+(+l.hours||0),0);
+  const pays=db.payments.length;
+  const totalPaid=db.payments.reduce((s,p)=>s+(+p.amount||0),0);
+  $('#dataCounts').innerHTML=`👥 ${emps} εργαζόμενοι<br>📝 ${logs} καταγραφές<br>⏱ ${fmtNum(totalH)} ώρες συνολικά<br>💶 ${pays} πληρωμές · €${fmtNum(totalPaid)} σύνολο`;
+}
+function exportData(){
+  const data=JSON.stringify(db,null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='backup-ergazomenon-'+todayISO()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  URL.revokeObjectURL(url);
+  flash('Το backup κατέβηκε ✓');
+}
+function importData(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const d=JSON.parse(reader.result);
+      if(!d||!Array.isArray(d.employees)||!Array.isArray(d.logs))throw new Error('bad');
+      if(!Array.isArray(d.payments))d.payments=[];
+      if(!confirm('Επαναφορά δεδομένων; Τα τρέχοντα δεδομένα θα αντικατασταθούν.'))return;
+      db=d;save();
+      fillEmpSelect();renderData();go('emp');
+      flash('Επαναφορά επιτυχής ✓');
+    }catch(e){alert('Μη έγκυρο αρχείο backup.');}
+  };
+  reader.readAsText(file);
+  ev.target.value='';
+}
+
+/* ---------- λοιπά ---------- */
+function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtNum(n){return (Math.round(n*10)/10).toString().replace('.',',');}
+function hLabel(l){return l.day?'1 ημέρα':fmtNum(l.hours)+' ώ';}
+function flash(msg){
+  const d=document.createElement('div');
+  d.textContent=msg;
+  d.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#243A30;color:#fff;padding:11px 20px;border-radius:30px;font-weight:700;font-size:14px;z-index:99;box-shadow:0 8px 24px rgba(0,0,0,.2)';
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1500);
+}
+
+/* ---------- init ---------- */
+$('#logDate').value=todayISO();
+fillEmpSelect();renderRecent();paintStars();
+</script>
+</body>
+</html>
