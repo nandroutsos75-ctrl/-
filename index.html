@@ -10,9 +10,7 @@
 <title>Εργαζόμενοι</title>
 <script>
 if("serviceWorker" in navigator){
-  window.addEventListener("load",function(){
-    navigator.serviceWorker.register("sw.js").catch(function(){});
-  });
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
 }
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -282,7 +280,8 @@ if("serviceWorker" in navigator){
         <div class="stat"><div class="n" id="stHours">0</div><div class="l">Συνολικές ώρες</div></div>
         <div class="stat alt"><div class="n" id="stAvg">–</div><div class="l">Μ.Ο. παραγωγικότητας</div></div>
       </div>
-      <div class="costbar"><span class="l">Εκτιμώμενο κόστος μισθοδοσίας</span><span class="v" id="stCost">€0</span></div>
+      <div class="costbar"><span class="l">Εκτιμώμενο κόστος (δεδουλευμένα)</span><span class="v" id="stCost">€0</span></div>
+      <div class="costbar"><span class="l">Πληρωμές περιόδου</span><span class="v" id="stPaid" style="color:var(--green)">€0</span></div>
       <div class="section-title">Ανά εργαζόμενο</div>
       <div id="sumList"></div>
     </section>
@@ -299,8 +298,15 @@ if("serviceWorker" in navigator){
         <div class="m"><b id="cardDays">0</b><small>ημέρες</small></div>
         <div class="m"><b id="cardRate">–</b><small>μ.ο. ★</small></div>
       </div>
-      <div class="costbar"><span class="l" id="cardCostLabel">Κόστος</span><span class="v" id="cardCost">€0</span></div>
+      <div class="costbar"><span class="l" id="cardCostLabel">Δεδουλευμένα</span><span class="v" id="cardCost">€0</span></div>
       <button class="btn ghost" onclick="editCurrentEmp()" style="margin-bottom:18px">✎ Επεξεργασία στοιχείων</button>
+
+      <div class="section-title">Πληρωμές</div>
+      <div class="costbar"><span class="l">Πληρωμένα</span><span class="v" id="cardPaid" style="color:var(--green)">€0</span></div>
+      <div class="costbar"><span class="l">Υπόλοιπο (οφειλόμενα)</span><span class="v" id="cardOwed">€0</span></div>
+      <button class="btn amber" onclick="openPayModal()" style="margin-bottom:16px">＋ Νέα πληρωμή</button>
+      <div id="cardPays"></div>
+
       <div class="section-title">Όλες οι καταγραφές</div>
       <div id="cardLogs"></div>
     </section>
@@ -362,13 +368,47 @@ if("serviceWorker" in navigator){
   </div>
 </div>
 
+<!-- MODAL: πληρωμή -->
+<div class="modal" id="payModal">
+  <div class="sheet">
+    <button class="close" onclick="closePayModal()">✕</button>
+    <h2 id="payModalTitle">Νέα πληρωμή</h2>
+    <div class="field">
+      <label>Εργαζόμενος</label>
+      <select id="payEmp"></select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Ημερομηνία</label>
+        <input type="date" id="payDate">
+      </div>
+      <div class="field">
+        <label>Ποσό (€)</label>
+        <input type="number" id="payAmount" inputmode="decimal" step="0.5" min="0" placeholder="π.χ. 200">
+      </div>
+    </div>
+    <div class="field">
+      <label>Σημείωση (προαιρετικό)</label>
+      <input type="text" id="payNote" placeholder="π.χ. προκαταβολή, εξόφληση εβδομάδας">
+    </div>
+    <button class="btn" onclick="savePay()">Αποθήκευση πληρωμής</button>
+    <button class="btn ghost" id="payDeleteBtn" style="margin-top:10px;display:none" onclick="deletePay()">Διαγραφή πληρωμής</button>
+  </div>
+</div>
+
 <script>
 /* ---------- Αποθήκευση (με ασφαλές fallback στη μνήμη) ---------- */
 const KEY='diax_ergaz_v1';
 let mem=null;
 function load(){
-  try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):{employees:[],logs:[]};}
-  catch(e){return mem||{employees:[],logs:[]};}
+  let d;
+  try{const r=localStorage.getItem(KEY);d=r?JSON.parse(r):null;}
+  catch(e){d=mem;}
+  if(!d)d={employees:[],logs:[],payments:[]};
+  if(!Array.isArray(d.employees))d.employees=[];
+  if(!Array.isArray(d.logs))d.logs=[];
+  if(!Array.isArray(d.payments))d.payments=[];
+  return d;
 }
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(db));}
@@ -475,8 +515,21 @@ function openCard(id){
   $('#cardHours').textContent=fmtNum(hours);
   $('#cardDays').textContent=days;
   $('#cardRate').textContent=avg?avg.toFixed(1):'–';
-  $('#cardCostLabel').textContent=e.wageType==='daily'?`Κόστος (${days} ημέρες)`:`Κόστος (${fmtNum(hours)} ώρες)`;
+  $('#cardCostLabel').textContent=e.wageType==='daily'?`Δεδουλευμένα (${days} ημέρες)`:`Δεδουλευμένα (${fmtNum(hours)} ώρες)`;
   $('#cardCost').textContent=cost===null?'—':'€'+fmtNum(cost);
+  // πληρωμές & υπόλοιπο
+  const pays=db.payments.filter(p=>p.empId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  const paid=pays.reduce((s,p)=>s+(+p.amount||0),0);
+  $('#cardPaid').textContent='€'+fmtNum(paid);
+  const owed=cost===null?null:(cost-paid);
+  const owedEl=$('#cardOwed');
+  if(owed===null){owedEl.textContent='—';owedEl.style.color='var(--muted)';}
+  else{owedEl.textContent='€'+fmtNum(owed);owedEl.style.color=owed>0.01?'var(--amber)':'var(--green)';}
+  const pe=$('#cardPays');
+  pe.innerHTML=pays.length?pays.map(p=>`<div class="log" onclick='editPay("${p.id}")'>
+      <div class="top"><b>${fmtDate(p.date)}</b><span class="h" style="color:var(--green)">€${fmtNum(p.amount)}</span></div>
+      ${p.note?`<div class="note">${esc(p.note)}</div>`:''}
+    </div>`).join(''):'<div class="empty" style="padding:22px">Καμία πληρωμή ακόμη.</div>';
   const lg=$('#cardLogs');
   lg.innerHTML=logs.length?logs.map(l=>`<div class="log">
       <button class="x" onclick='delLogCard("${l.id}")'>διαγραφή</button>
@@ -493,6 +546,44 @@ function editCurrentEmp(){if(currentCardId)editEmp(currentCardId);}
 function delLogCard(id){
   if(!confirm('Διαγραφή καταγραφής;'))return;
   db.logs=db.logs.filter(l=>l.id!==id);save();openCard(currentCardId);
+}
+
+/* ---------- Πληρωμές ---------- */
+let editingPay=null;
+function openPayModal(pay){
+  editingPay=pay||null;
+  $('#payModalTitle').textContent=pay?'Επεξεργασία πληρωμής':'Νέα πληρωμή';
+  const s=$('#payEmp');
+  if(!db.employees.length){s.innerHTML='<option value="">— πρόσθεσε πρώτα εργαζόμενο —</option>';}
+  else{s.innerHTML=db.employees.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');}
+  s.value=pay?pay.empId:(currentCardId||(db.employees[0]&&db.employees[0].id)||'');
+  $('#payDate').value=pay?pay.date:todayISO();
+  $('#payAmount').value=pay?pay.amount:'';
+  $('#payNote').value=pay?(pay.note||''):'';
+  $('#payDeleteBtn').style.display=pay?'flex':'none';
+  $('#payModal').classList.add('open');
+}
+function closePayModal(){$('#payModal').classList.remove('open');editingPay=null;}
+function savePay(){
+  const empId=$('#payEmp').value;
+  if(!empId){alert('Διάλεξε εργαζόμενο.');return;}
+  const amount=parseFloat($('#payAmount').value);
+  if(!(amount>0)){alert('Συμπλήρωσε ποσό μεγαλύτερο του 0.');return;}
+  const date=$('#payDate').value||todayISO();
+  const note=$('#payNote').value.trim();
+  if(editingPay){editingPay.empId=empId;editingPay.amount=amount;editingPay.date=date;editingPay.note=note;}
+  else{db.payments.push({id:uid(),empId,amount,date,note});}
+  save();closePayModal();
+  if(currentCardId)openCard(currentCardId);
+  flash('Η πληρωμή αποθηκεύτηκε ✓');
+}
+function editPay(id){openPayModal(db.payments.find(p=>p.id===id));}
+function deletePay(){
+  if(!editingPay)return;
+  if(!confirm('Διαγραφή πληρωμής;'))return;
+  db.payments=db.payments.filter(p=>p.id!==editingPay.id);
+  save();closePayModal();
+  if(currentCardId)openCard(currentCardId);
 }
 
 /* ---------- Καταγραφή ---------- */
@@ -636,6 +727,8 @@ function renderSum(){
   const avg=rated.length?(rated.reduce((s,l)=>s+l.rating,0)/rated.length):0;
   $('#stHours').textContent=fmtNum(totalH);
   $('#stAvg').textContent=avg?avg.toFixed(1)+'★':'–';
+  const paidPeriod=db.payments.filter(p=>inRange(p.date)).reduce((s,p)=>s+(+p.amount||0),0);
+  $('#stPaid').textContent='€'+fmtNum(paidPeriod);
   const el=$('#sumList');
   if(!db.employees.length){el.innerHTML='<div class="empty">Πρόσθεσε εργαζομένους για να δεις στατιστικά.</div>';$('#stCost').textContent='€0';return;}
   let totalCost=0,hasCost=false;
@@ -661,7 +754,9 @@ function renderSum(){
 function renderData(){
   const emps=db.employees.length, logs=db.logs.length;
   const totalH=db.logs.reduce((s,l)=>s+(+l.hours||0),0);
-  $('#dataCounts').innerHTML=`👥 ${emps} εργαζόμενοι<br>📝 ${logs} καταγραφές<br>⏱ ${fmtNum(totalH)} ώρες συνολικά`;
+  const pays=db.payments.length;
+  const totalPaid=db.payments.reduce((s,p)=>s+(+p.amount||0),0);
+  $('#dataCounts').innerHTML=`👥 ${emps} εργαζόμενοι<br>📝 ${logs} καταγραφές<br>⏱ ${fmtNum(totalH)} ώρες συνολικά<br>💶 ${pays} πληρωμές · €${fmtNum(totalPaid)} σύνολο`;
 }
 function exportData(){
   const data=JSON.stringify(db,null,2);
@@ -681,6 +776,7 @@ function importData(ev){
     try{
       const d=JSON.parse(reader.result);
       if(!d||!Array.isArray(d.employees)||!Array.isArray(d.logs))throw new Error('bad');
+      if(!Array.isArray(d.payments))d.payments=[];
       if(!confirm('Επαναφορά δεδομένων; Τα τρέχοντα δεδομένα θα αντικατασταθούν.'))return;
       db=d;save();
       fillEmpSelect();renderData();go('emp');
